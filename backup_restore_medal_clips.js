@@ -246,6 +246,7 @@ let prettyBytes;
 		const addFileToArchive = (fullPath, relativePath) => {
 			return new Promise((resolve, reject) => {
 				const startEntryTime = performance.now();
+				const fileSize = fs.statSync(fullPath).size || 0;
 				const fileStream = fs.createReadStream(fullPath);
 				fileStream.on("error", (err) => {
 					console.error(`Error reading file ${relativePath}: ${err.message}`);
@@ -256,10 +257,12 @@ let prettyBytes;
 					const endEntryTime = performance.now();
 					const duration = endEntryTime - startEntryTime;
 					console.log(
-						`Backing up: ${relativePath} (${duration.toFixed(2)} ms)`
+						`Backing up: ${relativePath} (${duration.toFixed(
+							2
+						)} ms - ${prettyBytes(fileSize)})`
 					);
 					totalFiles++;
-					totalSize += fs.statSync(fullPath).size || 0;
+					totalSize += fileSize;
 					resolve();
 				});
 			});
