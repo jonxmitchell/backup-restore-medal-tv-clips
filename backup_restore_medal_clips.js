@@ -292,6 +292,8 @@ let prettyBytes;
 		const extractPath = path.join(config.backupDir, "temp_restore");
 		const absoluteExtractPath = path.resolve(extractPath);
 
+		console.log("Starting restore process...");
+
 		try {
 			await extract(absoluteBackupZipPath, { dir: absoluteExtractPath });
 			console.log(`Extracted backup to ${absoluteExtractPath}`);
