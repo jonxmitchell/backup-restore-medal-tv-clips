@@ -4,6 +4,7 @@ const archiver = require("archiver");
 const readline = require("readline");
 const { exec } = require("child_process");
 const extract = require("extract-zip");
+const { performance } = require("perf_hooks");
 
 // Dynamically import pretty-bytes
 let prettyBytes;
@@ -241,9 +242,14 @@ let prettyBytes;
 		});
 
 		archive.on("entry", function (entry) {
-			totalFiles++;
-			totalSize += entry.stats.size || 0;
-			console.log(`Backing up: ${entry.name}`);
+			const entryStartTime = performance.now();
+			entry.on("end", () => {
+				const entryEndTime = performance.now();
+				const duration = entryEndTime - entryStartTime;
+				totalFiles++;
+				totalSize += entry.stats.size || 0;
+				console.log(`Backing up: ${entry.name} (${duration.toFixed(2)} ms)`);
+			});
 		});
 
 		archive.pipe(output);
