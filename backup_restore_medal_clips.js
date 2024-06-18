@@ -32,6 +32,81 @@ let prettyBytes;
 		}
 	}
 
+	function getDrives() {
+		return new Promise((resolve, reject) => {
+			exec("wmic logicaldisk get name", (error, stdout, stderr) => {
+				if (error) {
+					reject(error);
+				} else {
+					const drives = stdout
+						.split("\r\n")
+						.filter((line) => /^[A-Za-z]:/.test(line))
+						.map((line) => line.trim());
+					resolve(drives);
+				}
+			});
+		});
+	}
+
+	async function scanForMedalDir() {
+		const drives = await getDrives();
+		const foundDirectories = [];
+
+		const userProfile = process.env.USERPROFILE || process.env.HOME;
+		const commonDirs = [
+			userProfile,
+			path.join(userProfile, "Documents"),
+			path.join(userProfile, "Downloads"),
+			path.join(userProfile, "Desktop"),
+		];
+
+		for (const dir of commonDirs) {
+			const searchCommand = `powershell -Command "Get-ChildItem -Path '${dir}' -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Medal' } | Select-Object -ExpandProperty FullName"`;
+			try {
+				const result = await new Promise((resolve, reject) => {
+					exec(searchCommand, (error, stdout, stderr) => {
+						if (error) {
+							reject(error);
+						} else {
+							const directories = stdout
+								.trim()
+								.split("\n")
+								.map((dir) => dir.trim());
+							resolve(directories);
+						}
+					});
+				});
+				foundDirectories.push(...result);
+			} catch (error) {
+				console.warn(`Error scanning directory ${dir}: ${error.message}`);
+			}
+		}
+
+		for (const drive of drives) {
+			const searchCommand = `powershell -Command "Get-ChildItem -Path ${drive} -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Medal' } | Select-Object -ExpandProperty FullName"`;
+			try {
+				const result = await new Promise((resolve, reject) => {
+					exec(searchCommand, (error, stdout, stderr) => {
+						if (error) {
+							reject(error);
+						} else {
+							const directories = stdout
+								.trim()
+								.split("\n")
+								.map((dir) => dir.trim());
+							resolve(directories);
+						}
+					});
+				});
+				foundDirectories.push(...result);
+			} catch (error) {
+				console.warn(`Error scanning drive ${drive}: ${error.message}`);
+			}
+		}
+
+		return foundDirectories.filter((dir) => dir);
+	}
+
 	const getUserInput = (question) => {
 		return new Promise((resolve) => {
 			rl.question(question, (answer) => {
@@ -47,21 +122,85 @@ let prettyBytes;
 
 	const backupClips = async () => {
 		if (!config.medalClipsPath) {
-			const manualPath = await getUserInput(
-				"Please enter the Medal clips directory path: "
+			const userChoice = await getUserInput(
+				"Medal clips path is empty. Do you want to (1) manually enter the directory or (2) scan your PC for the /Medal directory? (Enter 1 or 2): "
 			);
-			config.medalClipsPath = manualPath.trim();
+			if (userChoice === "1") {
+				const manualPath = await getUserInput(
+					"Please enter the Medal clips directory path: "
+				);
+				config.medalClipsPath = manualPath.trim();
+			} else if (userChoice === "2") {
+				console.log("Scanning your PC for the /Medal directory...");
+				try {
+					const foundDirectories = await scanForMedalDir();
+					if (foundDirectories.length > 0) {
+						console.log("Found the following Medal clips directories:");
+						foundDirectories.forEach((dir, index) => {
+							console.log(`${index + 1}: ${dir}`);
+						});
+						const dirChoice = await getUserInput(
+							"Please select the directory number you want to use: "
+						);
+						const selectedDir = foundDirectories[parseInt(dirChoice) - 1];
+						if (selectedDir) {
+							config.medalClipsPath = selectedDir.trim();
+						} else {
+							console.error("Invalid selection. Exiting.");
+							process.exit(1);
+						}
+					} else {
+						console.error("No Medal clips directories found. Exiting.");
+						process.exit(1);
+					}
+				} catch (error) {
+					console.error(`Error scanning for directories: ${error.message}`);
+					process.exit(1);
+				}
+			} else {
+				console.error("Invalid choice. Exiting.");
+				process.exit(1);
+			}
 		}
 
 		if (!config.backupDir) {
-			const manualBackupPath = await getUserInput(
-				"Please enter the backup directory path: "
+			const userChoice = await getUserInput(
+				"Backup directory is empty. Do you want to (1) manually enter the backup directory or (2) use the default Backups directory? (Enter 1 or 2): "
 			);
-			config.backupDir = manualBackupPath.trim();
+			if (userChoice === "1") {
+				const manualBackupPath = await getUserInput(
+					"Please enter the backup directory path: "
+				);
+				config.backupDir = manualBackupPath.trim();
+			} else if (userChoice === "2") {
+				const scriptRoot = path.dirname(require.main.filename);
+				const defaultBackupDir = path.join(scriptRoot, "Backups");
+				ensureDirectoryExistence(defaultBackupDir);
+				config.backupDir = defaultBackupDir;
+			} else {
+				console.error("Invalid choice. Exiting.");
+				process.exit(1);
+			}
 		}
 
 		const medalClipsPath = path.resolve(config.medalClipsPath);
 		const backupDir = path.resolve(config.backupDir);
+
+		const clipsJsonPath = path.join(
+			process.env.APPDATA,
+			"Medal",
+			"store",
+			"clips.json"
+		);
+
+		const medaldirJsonContent = JSON.stringify({ medalDir: medalClipsPath });
+
+		rl.close();
+
+		if (!fs.existsSync(medalClipsPath)) {
+			console.error(`Error: The directory ${medalClipsPath} does not exist.`);
+			process.exit(1);
+		}
 
 		ensureDirectoryExistence(backupDir);
 
@@ -119,6 +258,16 @@ let prettyBytes;
 				);
 			}
 		});
+
+		if (fs.existsSync(clipsJsonPath)) {
+			archive.file(clipsJsonPath, { name: "clips.json" });
+		} else {
+			console.warn(
+				`Warning: The file ${clipsJsonPath} does not exist and will be skipped.`
+			);
+		}
+
+		archive.append(medaldirJsonContent, { name: "medaldir.json" });
 
 		archive
 			.finalize()
