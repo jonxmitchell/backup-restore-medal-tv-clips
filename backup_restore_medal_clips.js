@@ -241,51 +241,71 @@ let prettyBytes;
 			process.exit(1);
 		});
 
-		archive.on("entry", function (entry) {
-			const entryStartTime = performance.now();
-			entry.on("end", () => {
-				const entryEndTime = performance.now();
-				const duration = entryEndTime - entryStartTime;
-				totalFiles++;
-				totalSize += entry.stats.size || 0;
-				console.log(`Backing up: ${entry.name} (${duration.toFixed(2)} ms)`);
-			});
-		});
-
 		archive.pipe(output);
 
-		directoriesToBackup.forEach((dir) => {
-			const fullPath = path.join(medalClipsPath, dir);
-			if (fs.existsSync(fullPath)) {
-				archive.directory(fullPath, dir);
+		const addFileToArchive = (fullPath, relativePath) => {
+			return new Promise((resolve, reject) => {
+				const startEntryTime = performance.now();
+				const fileStream = fs.createReadStream(fullPath);
+				fileStream.on("error", (err) => {
+					console.error(`Error reading file ${relativePath}: ${err.message}`);
+					reject(err);
+				});
+				archive.append(fileStream, { name: relativePath });
+				fileStream.on("end", () => {
+					const endEntryTime = performance.now();
+					const duration = endEntryTime - startEntryTime;
+					console.log(
+						`Backing up: ${relativePath} (${duration.toFixed(2)} ms)`
+					);
+					totalFiles++;
+					totalSize += fs.statSync(fullPath).size || 0;
+					resolve();
+				});
+			});
+		};
+
+		const addFilesToArchive = async (directoryPath, basePath) => {
+			const items = fs.readdirSync(directoryPath);
+			for (const item of items) {
+				const fullPath = path.join(directoryPath, item);
+				const relativePath = path.relative(basePath, fullPath);
+
+				if (fs.statSync(fullPath).isDirectory()) {
+					await addFilesToArchive(fullPath, basePath);
+				} else {
+					await addFileToArchive(fullPath, relativePath);
+				}
+			}
+		};
+
+		try {
+			for (const dir of directoriesToBackup) {
+				const fullPath = path.join(medalClipsPath, dir);
+				if (fs.existsSync(fullPath)) {
+					await addFilesToArchive(fullPath, medalClipsPath);
+				} else {
+					console.warn(
+						`Warning: The directory ${fullPath} does not exist and will be skipped.`
+					);
+				}
+			}
+
+			if (fs.existsSync(clipsJsonPath)) {
+				await addFileToArchive(clipsJsonPath, "clips.json");
 			} else {
 				console.warn(
-					`Warning: The directory ${fullPath} does not exist and will be skipped.`
+					`Warning: The file ${clipsJsonPath} does not exist and will be skipped.`
 				);
 			}
-		});
 
-		if (fs.existsSync(clipsJsonPath)) {
-			archive.file(clipsJsonPath, { name: "clips.json" });
-		} else {
-			console.warn(
-				`Warning: The file ${clipsJsonPath} does not exist and will be skipped.`
-			);
+			archive.append(medaldirJsonContent, { name: "medaldir.json" });
+
+			await archive.finalize();
+		} catch (err) {
+			console.error(`Error during backup: ${err.message}`);
+			process.exit(1);
 		}
-
-		archive.append(medaldirJsonContent, { name: "medaldir.json" });
-
-		archive
-			.finalize()
-			.then(() => {
-				console.log(
-					"Archive has been finalized and the output file descriptor has closed."
-				);
-			})
-			.catch((err) => {
-				console.error(`Error finalizing archive: ${err.message}`);
-				process.exit(1);
-			});
 	};
 
 	const restoreClips = async () => {
