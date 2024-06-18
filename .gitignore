@@ -25,6 +25,7 @@ bower_components
 
 # Lock files
 package-lock.json
+package.json
 yarn.lock
 
 # dotenv environment variables file
