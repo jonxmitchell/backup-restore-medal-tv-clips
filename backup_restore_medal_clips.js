@@ -3,6 +3,7 @@ const path = require("path");
 const archiver = require("archiver");
 const readline = require("readline");
 const { exec } = require("child_process");
+const extract = require("extract-zip");
 
 // Dynamically import pretty-bytes
 let prettyBytes;
@@ -39,6 +40,11 @@ let prettyBytes;
 		});
 	};
 
+	const directoriesToBackup = [
+		...defaultDirectoriesToBackup,
+		...(config.directoriesToBackup || []),
+	];
+
 	const backupClips = async () => {
 		if (!config.medalClipsPath) {
 			const manualPath = await getUserInput(
@@ -53,11 +59,6 @@ let prettyBytes;
 			);
 			config.backupDir = manualBackupPath.trim();
 		}
-
-		const directoriesToBackup = [
-			...defaultDirectoriesToBackup,
-			...(config.directoriesToBackup || []),
-		];
 
 		const medalClipsPath = path.resolve(config.medalClipsPath);
 		const backupDir = path.resolve(config.backupDir);
@@ -132,12 +133,79 @@ let prettyBytes;
 			});
 	};
 
+	const restoreClips = async () => {
+		const backupZipPath = await getUserInput(
+			"Please enter the path to the backup ZIP file: "
+		);
+
+		const absoluteBackupZipPath = path.resolve(backupZipPath);
+
+		const extractPath = path.join(config.backupDir, "temp_restore");
+		const absoluteExtractPath = path.resolve(extractPath);
+
+		try {
+			await extract(absoluteBackupZipPath, { dir: absoluteExtractPath });
+			console.log(`Extracted backup to ${absoluteExtractPath}`);
+		} catch (err) {
+			console.error(`Error extracting backup: ${err.message}`);
+			process.exit(1);
+		}
+
+		const medaldirJsonPath = path.join(absoluteExtractPath, "medaldir.json");
+		let originalMedalDir;
+		try {
+			const medaldirJsonContent = fs.readFileSync(medaldirJsonPath, "utf-8");
+			const medaldirJson = JSON.parse(medaldirJsonContent);
+			originalMedalDir = medaldirJson.medalDir;
+		} catch (err) {
+			console.error(`Error reading medaldir.json: ${err.message}`);
+			process.exit(1);
+		}
+
+		const clipsJsonPath = path.join(
+			process.env.APPDATA,
+			"Medal",
+			"store",
+			"clips.json"
+		);
+
+		try {
+			fs.copyFileSync(
+				path.join(absoluteExtractPath, "clips.json"),
+				clipsJsonPath
+			);
+			console.log(`Restored clips.json to ${clipsJsonPath}`);
+		} catch (err) {
+			console.error(`Error restoring clips.json: ${err.message}`);
+			process.exit(1);
+		}
+
+		directoriesToBackup.forEach((dir) => {
+			const srcDir = path.join(absoluteExtractPath, dir);
+			const destDir = path.join(originalMedalDir, dir);
+			if (fs.existsSync(srcDir)) {
+				ensureDirectoryExistence(destDir);
+				fs.cpSync(srcDir, destDir, { recursive: true });
+				console.log(`Restored ${dir} to ${destDir}`);
+			} else {
+				console.warn(
+					`Warning: The directory ${srcDir} does not exist and will be skipped.`
+				);
+			}
+		});
+
+		console.log("Restore completed successfully.");
+		process.exit(0);
+	};
+
 	const mode = await getUserInput(
 		"Do you want to (1) backup or (2) restore? (Enter 1 or 2): "
 	);
 
 	if (mode === "1") {
 		await backupClips();
+	} else if (mode === "2") {
+		await restoreClips();
 	} else {
 		console.error("Invalid choice. Exiting.");
 		process.exit(1);
