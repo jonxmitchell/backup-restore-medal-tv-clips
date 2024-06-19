@@ -28,6 +28,13 @@ let prettyBytes, chalk;
 		"Screenshots",
 	];
 
+	const directoriesToBackup = [
+		...new Set([
+			...defaultDirectoriesToBackup,
+			...(config.directoriesToBackup || []),
+		]),
+	];
+
 	function ensureDirectoryExistence(dir) {
 		if (!fs.existsSync(dir)) {
 			fs.mkdirSync(dir, { recursive: true });
@@ -116,11 +123,6 @@ let prettyBytes, chalk;
 			});
 		});
 	};
-
-	const directoriesToBackup = [
-		...defaultDirectoriesToBackup,
-		...(config.directoriesToBackup || []),
-	];
 
 	const backupClips = async () => {
 		if (!config.medalClipsPath) {
