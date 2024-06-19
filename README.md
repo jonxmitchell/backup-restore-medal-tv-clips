@@ -2,6 +2,8 @@
 
 This project provides a Node.js script for backing up and restoring Medal.tv clips and associated data. The script supports the inclusion of additional directories specified in a configuration file and ensures that system and protected directories are excluded during the backup and restore processes.
 
+This script is designed to automate the guide provided by Medal.tv on [how to backup clips before formatting your system/OS](https://support.medal.tv/support/solutions/articles/48001227747-how-to-backup-clips-before-formatting-your-system-os).
+
 ## Features
 
 - **🔒 Backup Medal.tv clips and data**: Back up specified directories and the `clips.json` file from Medal.tv.
