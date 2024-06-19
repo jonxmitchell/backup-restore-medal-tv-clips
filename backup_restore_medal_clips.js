@@ -119,7 +119,7 @@ let prettyBytes, chalk;
 	const getUserInput = (question) => {
 		return new Promise((resolve) => {
 			rl.question(question, (answer) => {
-				resolve(answer);
+				resolve(answer.trim().replace(/^"|"$/g, "")); // Remove surrounding double quotes if present
 			});
 		});
 	};
@@ -138,7 +138,7 @@ let prettyBytes, chalk;
 				const manualPath = await getUserInput(
 					"Please enter the Medal clips directory path: "
 				);
-				config.medalClipsPath = manualPath.trim();
+				config.medalClipsPath = manualPath;
 			} else if (userChoice === "2") {
 				console.log("Scanning your PC for the /Medal directory...");
 				try {
@@ -153,7 +153,7 @@ let prettyBytes, chalk;
 						);
 						const selectedDir = foundDirectories[parseInt(dirChoice) - 1];
 						if (selectedDir) {
-							config.medalClipsPath = selectedDir.trim();
+							config.medalClipsPath = selectedDir;
 						} else {
 							console.error("Invalid selection. Exiting.");
 							process.exit(1);
@@ -180,7 +180,7 @@ let prettyBytes, chalk;
 				const manualBackupPath = await getUserInput(
 					"Please enter the backup directory path: "
 				);
-				config.backupDir = manualBackupPath.trim();
+				config.backupDir = manualBackupPath;
 			} else if (userChoice === "2") {
 				const scriptRoot = path.dirname(require.main.filename);
 				const defaultBackupDir = path.join(scriptRoot, "Backups");
