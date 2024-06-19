@@ -6,11 +6,12 @@ const { exec } = require("child_process");
 const extract = require("extract-zip");
 const { performance } = require("perf_hooks");
 
-// Dynamically import pretty-bytes
-let prettyBytes;
+// Dynamically import pretty-bytes and chalk
+let prettyBytes, chalk;
 
 (async () => {
 	prettyBytes = (await import("pretty-bytes")).default;
+	chalk = (await import("chalk")).default;
 
 	const rl = readline.createInterface({
 		input: process.stdin,
@@ -223,11 +224,21 @@ let prettyBytes;
 			const endTime = Date.now();
 			const duration = (endTime - startTime) / 1000;
 			console.log(
-				`Backup completed successfully. The backup file is located at: ${backupZipPath}`
+				`${chalk.cyan(
+					"Backup completed successfully. The backup file is located at:"
+				)} ${chalk.magenta(backupZipPath)}`
 			);
-			console.log(`Total files: ${totalFiles}`);
-			console.log(`Total size: ${prettyBytes(totalSize || 0)}`);
-			console.log(`Total time: ${duration} seconds`);
+			console.log(`${chalk.cyan("Total files:")} ${chalk.magenta(totalFiles)}`);
+			console.log(
+				`${chalk.cyan("Total size:")} ${chalk.magenta(
+					prettyBytes(totalSize || 0)
+				)}`
+			);
+			console.log(
+				`${chalk.cyan("Total time:")} ${chalk.magenta(
+					`${duration.toFixed(3)} seconds`
+				)}`
+			);
 			process.exit(0);
 		});
 
@@ -257,9 +268,11 @@ let prettyBytes;
 					const endEntryTime = performance.now();
 					const duration = endEntryTime - startEntryTime;
 					console.log(
-						`Backing up: ${relativePath} (${duration.toFixed(
-							2
-						)} ms - ${prettyBytes(fileSize)})`
+						`${chalk.blue("Backing up:")} ${chalk.green(
+							relativePath
+						)} ${chalk.red(
+							`(${duration.toFixed(2)} ms - ${prettyBytes(fileSize)})`
+						)}`
 					);
 					totalFiles++;
 					totalSize += fileSize;
@@ -321,11 +334,15 @@ let prettyBytes;
 		const extractPath = path.join(config.backupDir, "temp_restore");
 		const absoluteExtractPath = path.resolve(extractPath);
 
-		console.log("Starting restore process...");
+		console.log(chalk.cyan("Starting restore process..."));
 
 		try {
 			await extract(absoluteBackupZipPath, { dir: absoluteExtractPath });
-			console.log(`Extracted backup to ${absoluteExtractPath}`);
+			console.log(
+				`${chalk.cyan("Extracted backup to")} ${chalk.magenta(
+					absoluteExtractPath
+				)}`
+			);
 		} catch (err) {
 			console.error(`Error extracting backup: ${err.message}`);
 			process.exit(1);
@@ -354,7 +371,11 @@ let prettyBytes;
 				path.join(absoluteExtractPath, "clips.json"),
 				clipsJsonPath
 			);
-			console.log(`Restored clips.json to ${clipsJsonPath}`);
+			console.log(
+				`${chalk.blue("Restored")} ${chalk.green(
+					`clips.json to ${clipsJsonPath}`
+				)}`
+			);
 		} catch (err) {
 			console.error(`Error restoring clips.json: ${err.message}`);
 			process.exit(1);
@@ -366,7 +387,9 @@ let prettyBytes;
 			if (fs.existsSync(srcDir)) {
 				ensureDirectoryExistence(destDir);
 				fs.cpSync(srcDir, destDir, { recursive: true });
-				console.log(`Restored ${dir} to ${destDir}`);
+				console.log(
+					`${chalk.blue("Restored")} ${chalk.green(`${dir} to ${destDir}`)}`
+				);
 			} else {
 				console.warn(
 					`Warning: The directory ${srcDir} does not exist and will be skipped.`
@@ -374,7 +397,7 @@ let prettyBytes;
 			}
 		});
 
-		console.log("Restore completed successfully.");
+		console.log(chalk.cyan("Restore completed successfully."));
 		process.exit(0);
 	};
 
