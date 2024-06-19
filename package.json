@@ -1,0 +1,26 @@
+{
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "chalk": "^5.3.0",
+    "extract-zip": "^2.0.1",
+    "pretty-bytes": "^6.1.1"
+  },
+  "name": "backup-restore-medal-tv-clips",
+  "description": "This project provides a Node.js script for backing up and restoring Medal.tv clips and associated data. The script supports the inclusion of additional directories specified in a configuration file and ensures that system and protected directories are excluded during the backup and restore processes.",
+  "version": "1.0.0",
+  "main": "backup_restore_medal_clips.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonxmitchell/backup-restore-medal-tv-clips.git"
+  },
+  "author": "Jonxmitchell",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jonxmitchell/backup-restore-medal-tv-clips/issues"
+  },
+  "homepage": "https://github.com/jonxmitchell/backup-restore-medal-tv-clips#readme"
+}
