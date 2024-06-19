@@ -339,7 +339,7 @@ let prettyBytes, chalk;
 		try {
 			await extract(absoluteBackupZipPath, { dir: absoluteExtractPath });
 			console.log(
-				`${chalk.cyan("Extracted backup to")} ${chalk.magenta(
+				`${chalk.cyan("Extracted backup to:")} ${chalk.magenta(
 					absoluteExtractPath
 				)}`
 			);
@@ -367,29 +367,59 @@ let prettyBytes, chalk;
 		);
 
 		try {
+			const startEntryTime = performance.now();
+			const fileSize =
+				fs.statSync(path.join(absoluteExtractPath, "clips.json")).size || 0;
 			fs.copyFileSync(
 				path.join(absoluteExtractPath, "clips.json"),
 				clipsJsonPath
 			);
+			const endEntryTime = performance.now();
+			const duration = endEntryTime - startEntryTime;
 			console.log(
-				`${chalk.blue("Restored")} ${chalk.green(
-					`clips.json to ${clipsJsonPath}`
-				)}`
+				`${chalk.blue("Restored")} ${chalk.red(
+					`(${duration.toFixed(2)} ms - ${prettyBytes(fileSize)})`
+				)}\n${chalk.cyan("From:")} ${chalk.green(
+					path.join(absoluteExtractPath, "clips.json")
+				)}\n${chalk.cyan("To:")} ${chalk.green(clipsJsonPath)}`
 			);
 		} catch (err) {
 			console.error(`Error restoring clips.json: ${err.message}`);
 			process.exit(1);
 		}
 
+		const restoreDirectory = (srcDir, destDir) => {
+			const items = fs.readdirSync(srcDir);
+			for (const item of items) {
+				const srcPath = path.join(srcDir, item);
+				const destPath = path.join(destDir, item);
+
+				if (fs.statSync(srcPath).isDirectory()) {
+					ensureDirectoryExistence(destPath);
+					restoreDirectory(srcPath, destPath);
+				} else {
+					const startEntryTime = performance.now();
+					const fileSize = fs.statSync(srcPath).size || 0;
+					fs.copyFileSync(srcPath, destPath);
+					const endEntryTime = performance.now();
+					const duration = endEntryTime - startEntryTime;
+					console.log(
+						`${chalk.blue("Restored")} ${chalk.red(
+							`(${duration.toFixed(2)} ms - ${prettyBytes(fileSize)})`
+						)}\n${chalk.cyan("From:")} ${chalk.green(srcPath)}\n${chalk.cyan(
+							"To:"
+						)} ${chalk.green(destPath)}`
+					);
+				}
+			}
+		};
+
 		directoriesToBackup.forEach((dir) => {
 			const srcDir = path.join(absoluteExtractPath, dir);
 			const destDir = path.join(originalMedalDir, dir);
 			if (fs.existsSync(srcDir)) {
 				ensureDirectoryExistence(destDir);
-				fs.cpSync(srcDir, destDir, { recursive: true });
-				console.log(
-					`${chalk.blue("Restored")} ${chalk.green(`${dir} to ${destDir}`)}`
-				);
+				restoreDirectory(srcDir, destDir);
 			} else {
 				console.warn(
 					`Warning: The directory ${srcDir} does not exist and will be skipped.`
