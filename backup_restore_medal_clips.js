@@ -124,6 +124,11 @@ let prettyBytes, chalk;
 		});
 	};
 
+	const shouldExclude = (filePath) => {
+		const excludedDirs = ["System Volume Information", "$RECYCLE.BIN"];
+		return excludedDirs.some((excludedDir) => filePath.includes(excludedDir));
+	};
+
 	const backupClips = async () => {
 		if (!config.medalClipsPath) {
 			const userChoice = await getUserInput(
@@ -258,6 +263,10 @@ let prettyBytes, chalk;
 
 		const addFileToArchive = (fullPath, relativePath) => {
 			return new Promise((resolve, reject) => {
+				if (shouldExclude(fullPath)) {
+					console.warn(`Skipping excluded file: ${fullPath}`);
+					return resolve();
+				}
 				const startEntryTime = performance.now();
 				const fileSize = fs.statSync(fullPath).size || 0;
 				const fileStream = fs.createReadStream(fullPath);
@@ -395,6 +404,11 @@ let prettyBytes, chalk;
 			for (const item of items) {
 				const srcPath = path.join(srcDir, item);
 				const destPath = path.join(destDir, item);
+
+				if (shouldExclude(srcPath)) {
+					console.warn(`Skipping excluded file: ${srcPath}`);
+					continue;
+				}
 
 				if (fs.statSync(srcPath).isDirectory()) {
 					ensureDirectoryExistence(destPath);
